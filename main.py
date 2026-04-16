@@ -11,7 +11,7 @@ from config import (
     TARGET_USER, START_HOUR, END_HOUR, SCREENSHOT_PATH
 )
 from parser import parse_message
-from device_controller import execute_task
+from device_controller import execute_task, keep_screen_on
 
 logging.basicConfig(
     level=logging.INFO,
@@ -84,9 +84,14 @@ async def handle_group_message(client: Client, message: Message):
 
 async def main():
     logger.info("Iniciando bot. Activo de %dhs a %dhs.", START_HOUR, END_HOUR)
+
+    # Mantener pantalla encendida
+    await asyncio.get_event_loop().run_in_executor(None, keep_screen_on)
+
     await app.start()
     me = await app.get_me()
-    logger.info("Sesion iniciada como @%s", me.username)
+    nombre = me.username or me.first_name or me.phone_number
+    logger.info("Sesion iniciada como %s", nombre)
     await asyncio.Event().wait()
 
 

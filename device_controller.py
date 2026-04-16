@@ -25,6 +25,15 @@ def _root(cmd: str, timeout: int = 30) -> tuple[bool, str]:
         return False, str(e)
 
 
+def keep_screen_on() -> None:
+    """Mantiene la pantalla encendida indefinidamente (requiere root)."""
+    # Timeout de pantalla al maximo posible (never off)
+    _root("settings put system screen_off_timeout 2147483647")
+    # Mantener CPU y pantalla despiertos
+    _root("echo tap_bot_wakelock > /sys/power/wake_lock")
+    logger.info("Pantalla configurada para mantenerse encendida.")
+
+
 def open_url(url: str) -> bool:
     """Abre una URL en el browser/app del sistema."""
     ok, out = _root(f'am start -a android.intent.action.VIEW -d "{url}"')
