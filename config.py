@@ -25,7 +25,7 @@ START_HOUR = 9   # 9am
 END_HOUR = 21    # 9pm
 
 # Segundos de espera tras abrir el link antes de tocar
-WAIT_AFTER_OPEN = 4
+WAIT_AFTER_OPEN = 30
 
 # Ruta del screenshot temporal (en almacenamiento interno)
 SCREENSHOT_PATH = "/sdcard/Download/tap_screenshot.png"
