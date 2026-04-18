@@ -2,6 +2,7 @@
 *.session
 *.session-journal
 bot.log
+sessions/
 __pycache__/
 *.pyc
 /tmp/
