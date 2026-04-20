@@ -30,7 +30,7 @@ class _SanitizeFilter(logging.Filter):
         return True
 
 
-_log_path = os.path.join(os.path.expanduser("~/telegram-bot-tap"), "bot.log")
+_log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot.log")
 _handler_file   = logging.FileHandler(_log_path)
 _handler_stream = logging.StreamHandler()
 _sanitizer      = _SanitizeFilter()
