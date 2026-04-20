@@ -3,11 +3,10 @@ import re
 import asyncio
 from datetime import datetime
 from dotenv import load_dotenv
-from pyrogram import Client
-from pyrogram.handlers import MessageHandler
+from pyrogram import Client, filters
+from pyrogram.types import Message
 
 load_dotenv()
-
 API_ID   = int(os.environ["API_ID"])
 API_HASH = os.environ["API_HASH"]
 PHONE    = os.environ["PHONE"]
@@ -40,13 +39,11 @@ def es_tarea(texto):
 async def procesar_tarea(client, texto):
     numero = extraer_numero_tarea(texto)
     url    = extraer_url(texto)
-
     print(f"\n{'='*40}")
     print(f"  *** TAREA #{numero} DETECTADA ***")
     if url:
         print(f"  URL: {url}")
     print(f"{'='*40}\n")
-
     aviso = f"Tarea #{numero} detectada\n{url}" if url else f"Tarea #{numero} detectada\n(sin URL)"
     try:
         await client.send_message(BOT_DEST, aviso)
@@ -54,23 +51,19 @@ async def procesar_tarea(client, texto):
     except Exception as e:
         print(f"  [ERROR] No se pudo enviar a @{BOT_DEST}: {e}")
 
-async def handler_live(client, message):
+# ✅ Decorador con filtro de chat — se registra ANTES de app.start()
+@app.on_message(filters.chat(GROUP) & (filters.text | filters.caption))
+async def handler_live(client: Client, message: Message):
     hora   = datetime.now().strftime("%H:%M:%S")
     nombre = message.from_user.first_name if message.from_user else "Desconocido"
     texto  = message.text or message.caption or "(sin texto)"
     chat   = getattr(message.chat, "username", None) or str(message.chat.id)
-
     print(f"[LIVE {hora}] [{chat}] {nombre}: {texto[:80]}")
-
     if es_tarea(texto):
         await procesar_tarea(client, texto)
 
 async def main():
     await app.start()
-    app.add_handler(MessageHandler(handler_live))
-
-    async for _ in app.get_dialogs():
-        break
 
     loop = asyncio.get_event_loop()
     raw  = await loop.run_in_executor(None, input, "¿Cuántos mensajes del historial revisar? (50-500): ")
@@ -88,7 +81,6 @@ async def main():
             await procesar_tarea(app, texto)
 
     print("\nHistorial revisado. Escuchando en vivo... (Ctrl+C para salir)")
-    while True:
-        await asyncio.sleep(1)
+    await asyncio.Event().wait()  # ✅ Más limpio que while True + sleep
 
 asyncio.run(main())
