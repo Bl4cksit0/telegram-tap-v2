@@ -1,4 +1,5 @@
 import asyncio
+import glob
 import logging
 import os
 import re
@@ -45,6 +46,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+# ── Sesión ────────────────────────────────────────────────────────────────────
+def _delete_session() -> None:
+    for path in glob.glob(os.path.join(SESSION_PATH, "tap_session.session*")):
+        try:
+            os.remove(path)
+            logger.info("Sesion borrada: %s", path)
+        except OSError as e:
+            logger.warning("No se pudo borrar sesion %s: %s", path, e)
+
+
 app = Client(
     "tap_session",
     api_id=API_ID,
@@ -54,42 +66,7 @@ app = Client(
 )
 
 
-def _ask_history_limit() -> int:
-    while True:
-        try:
-            val = int(input("¿Cuántos mensajes del historial querés cargar? [50-500]: "))
-            if 50 <= val <= 500:
-                return val
-            print("  Ingresá un número entre 50 y 500.")
-        except ValueError:
-            print("  Ingresá un número válido.")
-
-
-async def _load_history(client: Client):
-    limit = _ask_history_limit()
-    logger.info("Sincronizando chats...")
-    async for _ in client.get_dialogs():
-        pass
-    print("\n" + "="*60)
-    print(f"  HISTORIAL DEL GRUPO: {GROUP}")
-    print("="*60)
-    messages = []
-    async for msg in client.get_chat_history(GROUP, limit=limit):
-        messages.append(msg)
-
-    if not messages:
-        print("  (sin mensajes previos)")
-    else:
-        for msg in reversed(messages):
-            text   = msg.text or msg.caption or "[sin texto]"
-            sender = msg.from_user.first_name if msg.from_user else "Desconocido"
-            ts     = msg.date.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"  [{ts}] {sender}: {text}")
-
-    print("="*60)
-    print(f"  {len(messages)} mensajes cargados. Escuchando en vivo...\n")
-
-
+# ── Mensajes en vivo ──────────────────────────────────────────────────────────
 @app.on_message(filters.chat(GROUP) & (filters.text | filters.caption))
 async def show_live_message(client: Client, message: Message):
     text   = message.text or message.caption or "[sin texto]"
@@ -98,32 +75,44 @@ async def show_live_message(client: Client, message: Message):
     print(f"[LIVE {ts}] {sender}: {text}")
 
 
+# ── Comando logout (mensajes guardados) ───────────────────────────────────────
+@app.on_message(filters.private & filters.me & filters.text)
+async def handle_self_command(client: Client, message: Message):
+    if message.text.strip().lower() == "logout":
+        logger.info("Comando logout recibido. Borrando sesion y apagando.")
+        await app.stop()
+        _delete_session()
+        os._exit(0)
+
+
+# ── Heartbeat ─────────────────────────────────────────────────────────────────
 async def _heartbeat():
     while True:
         logger.info("heartbeat OK")
         await asyncio.sleep(HEARTBEAT_INTERVAL)
 
 
+# ── Main ──────────────────────────────────────────────────────────────────────
 async def _run():
-    logger.info("Iniciando bot.")
-    try:
-        await app.start()
-        me = await app.get_me()
-        logger.info("Sesion iniciada como %s", me.username or me.first_name)
-        await _load_history(app)
-        asyncio.create_task(_heartbeat())
-        await asyncio.Event().wait()
-    finally:
-        try:
-            await app.stop()
-        except Exception:
-            pass
+    logger.info("Iniciando bot. Borrando sesion anterior para nueva verificacion...")
+    _delete_session()
+
+    logger.info("Ingresa el codigo de verificacion de Telegram cuando se solicite.")
+    await app.start()
+    me = await app.get_me()
+    logger.info("Sesion iniciada como %s. Escuchando mensajes en vivo.", me.username or me.first_name)
+    logger.info("Para cerrar sesion y apagar: envia 'logout' a tus Mensajes guardados.")
+
+    asyncio.create_task(_heartbeat())
+    await asyncio.Event().wait()
 
 
 async def main():
     while True:
         try:
             await _run()
+        except SystemExit:
+            raise
         except Exception as e:
             logger.error("Error fatal: %s. Reiniciando en %ds...", e, ERROR_PAUSE_SECONDS)
             await asyncio.sleep(ERROR_PAUSE_SECONDS)
