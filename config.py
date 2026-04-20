@@ -24,7 +24,7 @@ TARGET_USER = os.getenv("TARGET_USER", "@ThorBcKBot")
 
 # ── Ruta de sesión ────────────────────────────────────────────────────────────
 SESSION_PATH = os.path.expanduser(
-    os.getenv("SESSION_PATH", "~/telegram-bot-tap")
+    os.getenv("SESSION_PATH", os.path.dirname(os.path.abspath(__file__)))
 )
 
 # ── Horario activo ────────────────────────────────────────────────────────────
