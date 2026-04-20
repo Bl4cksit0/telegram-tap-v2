@@ -2,7 +2,7 @@ import os
 import re
 from datetime import datetime
 from dotenv import load_dotenv
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
 
 load_dotenv()
 
@@ -35,31 +35,55 @@ def es_tarea(texto):
     tiene_captura = "captura" in texto.lower()
     return tiene_lista and (tiene_youtube or tiene_captura)
 
+async def procesar_tarea(client, texto):
+    numero = extraer_numero_tarea(texto)
+    url    = extraer_url(texto)
+
+    print(f"\n{'='*40}")
+    print(f"  *** TAREA #{numero} DETECTADA ***")
+    if url:
+        print(f"  URL: {url}")
+    print(f"{'='*40}\n")
+
+    aviso = f"Tarea #{numero} detectada\n{url}" if url else f"Tarea #{numero} detectada\n(sin URL)"
+    try:
+        await client.send_message(BOT_DEST, aviso)
+        print(f"  [OK] Mensaje enviado a @{BOT_DEST}")
+    except Exception as e:
+        print(f"  [ERROR] No se pudo enviar a @{BOT_DEST}: {e}")
+
 @app.on_message(filters.chat(GROUP))
 async def leer_mensaje(client, message):
     hora   = datetime.now().strftime("%H:%M:%S")
     nombre = message.from_user.first_name if message.from_user else "Desconocido"
     texto  = message.text or message.caption or "(sin texto)"
 
-    print(f"[{hora}] {nombre}: {texto}")
+    print(f"[LIVE {hora}] {nombre}: {texto}")
     print(f"  [DEBUG] es_tarea={es_tarea(texto)}")
 
     if es_tarea(texto):
-        numero = extraer_numero_tarea(texto)
-        url    = extraer_url(texto)
+        await procesar_tarea(client, texto)
 
-        print(f"\n{'='*40}")
-        print(f"  *** TAREA #{numero} DETECTADA [{hora}] ***")
-        if url:
-            print(f"  URL: {url}")
-        print(f"{'='*40}\n")
+async def main():
+    await app.start()
+    await app.get_dialogs()
 
-        aviso = f"Tarea #{numero} detectada\n{url}" if url else f"Tarea #{numero} detectada\n(sin URL)"
-        try:
-            await client.send_message(BOT_DEST, aviso)
-            print(f"  [OK] Mensaje enviado a @{BOT_DEST}")
-        except Exception as e:
-            print(f"  [ERROR] No se pudo enviar a @{BOT_DEST}: {e}")
+    limite = input("¿Cuántos mensajes del historial revisar? (50-500): ").strip()
+    limite = max(50, min(500, int(limite) if limite.isdigit() else 100))
 
-print("Escuchando mensajes en vivo... (Ctrl+C para salir)")
-app.run()
+    print(f"\nRevisando los últimos {limite} mensajes del historial...")
+    async for msg in app.get_chat_history(GROUP, limit=limite):
+        texto = msg.text or msg.caption or ""
+        if not texto:
+            continue
+        fecha = msg.date.strftime("%Y-%m-%d %H:%M")
+        nombre = msg.from_user.first_name if msg.from_user else "Desconocido"
+        print(f"[{fecha}] {nombre}: {texto[:80]}")
+        if es_tarea(texto):
+            await procesar_tarea(app, texto)
+
+    print("\nHistorial revisado. Escuchando mensajes en vivo... (Ctrl+C para salir)")
+    await idle()
+    await app.stop()
+
+app.run(main())
