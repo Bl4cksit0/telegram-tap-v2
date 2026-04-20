@@ -66,7 +66,8 @@ async def leer_mensaje(client, message):
 
 async def main():
     await app.start()
-    await app.get_dialogs()
+    async for _ in app.get_dialogs():
+        break
 
     limite = input("¿Cuántos mensajes del historial revisar? (50-500): ").strip()
     limite = max(50, min(500, int(limite) if limite.isdigit() else 100))
