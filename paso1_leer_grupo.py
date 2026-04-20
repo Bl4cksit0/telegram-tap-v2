@@ -41,6 +41,9 @@ async def leer_mensaje(client, message):
     nombre = message.from_user.first_name if message.from_user else "Desconocido"
     texto  = message.text or message.caption or "(sin texto)"
 
+    print(f"[{hora}] {nombre}: {texto}")
+    print(f"  [DEBUG] es_tarea={es_tarea(texto)}")
+
     if es_tarea(texto):
         numero = extraer_numero_tarea(texto)
         url    = extraer_url(texto)
@@ -49,14 +52,14 @@ async def leer_mensaje(client, message):
         print(f"  *** TAREA #{numero} DETECTADA [{hora}] ***")
         if url:
             print(f"  URL: {url}")
-        print(f"{'='*40}")
-        print(texto)
         print(f"{'='*40}\n")
 
         aviso = f"Tarea #{numero} detectada\n{url}" if url else f"Tarea #{numero} detectada\n(sin URL)"
-        await client.send_message(BOT_DEST, aviso)
-    else:
-        print(f"[{hora}] {nombre}: {texto}")
+        try:
+            await client.send_message(BOT_DEST, aviso)
+            print(f"  [OK] Mensaje enviado a @{BOT_DEST}")
+        except Exception as e:
+            print(f"  [ERROR] No se pudo enviar a @{BOT_DEST}: {e}")
 
 print("Escuchando mensajes en vivo... (Ctrl+C para salir)")
 app.run()
