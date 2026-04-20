@@ -52,17 +52,18 @@ async def procesar_tarea(client, texto):
     except Exception as e:
         print(f"  [ERROR] No se pudo enviar a @{BOT_DEST}: {e}")
 
-@app.on_message(filters.chat(GROUP))
+@app.on_message()
 async def leer_mensaje(client, message):
     hora   = datetime.now().strftime("%H:%M:%S")
     nombre = message.from_user.first_name if message.from_user else "Desconocido"
     texto  = message.text or message.caption or "(sin texto)"
+    chat   = getattr(message.chat, "username", None) or str(message.chat.id)
 
-    print(f"[LIVE {hora}] {nombre}: {texto}")
-    print(f"  [DEBUG] es_tarea={es_tarea(texto)}")
+    print(f"[LIVE {hora}] [{chat}] {nombre}: {texto[:60]}")
 
-    if es_tarea(texto):
-        await procesar_tarea(client, texto)
+    if chat == GROUP.lstrip("@") or str(message.chat.id) == GROUP:
+        if es_tarea(texto):
+            await procesar_tarea(client, texto)
 
 async def main():
     await app.start()
