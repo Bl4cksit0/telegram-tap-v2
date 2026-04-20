@@ -55,6 +55,7 @@ app = Client(
 
 
 async def _load_history(client: Client):
+    await client.get_chat(GROUP)
     print("\n" + "="*60)
     print(f"  HISTORIAL DEL GRUPO: {GROUP}")
     print("="*60)
