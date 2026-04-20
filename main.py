@@ -92,12 +92,18 @@ async def _heartbeat():
 
 async def _run():
     logger.info("Iniciando bot.")
-    await app.start()
-    me = await app.get_me()
-    logger.info("Sesion iniciada como %s", me.username or me.first_name)
-    await _load_history(app)
-    asyncio.create_task(_heartbeat())
-    await asyncio.Event().wait()
+    try:
+        await app.start()
+        me = await app.get_me()
+        logger.info("Sesion iniciada como %s", me.username or me.first_name)
+        await _load_history(app)
+        asyncio.create_task(_heartbeat())
+        await asyncio.Event().wait()
+    finally:
+        try:
+            await app.stop()
+        except Exception:
+            pass
 
 
 async def main():
