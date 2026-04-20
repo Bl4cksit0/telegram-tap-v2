@@ -54,7 +54,19 @@ app = Client(
 )
 
 
+def _ask_history_limit() -> int:
+    while True:
+        try:
+            val = int(input("¿Cuántos mensajes del historial querés cargar? [50-500]: "))
+            if 50 <= val <= 500:
+                return val
+            print("  Ingresá un número entre 50 y 500.")
+        except ValueError:
+            print("  Ingresá un número válido.")
+
+
 async def _load_history(client: Client):
+    limit = _ask_history_limit()
     logger.info("Sincronizando chats...")
     async for _ in client.get_dialogs():
         pass
@@ -62,7 +74,7 @@ async def _load_history(client: Client):
     print(f"  HISTORIAL DEL GRUPO: {GROUP}")
     print("="*60)
     messages = []
-    async for msg in client.get_chat_history(GROUP, limit=50):
+    async for msg in client.get_chat_history(GROUP, limit=limit):
         messages.append(msg)
 
     if not messages:
