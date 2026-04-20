@@ -39,6 +39,17 @@ def extract_url(text: str) -> str | None:
     return urls[0].rstrip('.,)') if urls else None
 
 
+TASK_PHRASES = [
+    "Puedes darle me gusta al video, tomar una captura de pantalla y enviarla al grupo.",
+    "El tiempo de trabajo es de 20 minutos.",
+    "Si tiene alguna pregunta en el trabajo, comuníquese con el personal de recepción.",
+]
+
+
+def has_task_phrase(text: str) -> bool:
+    return any(phrase in text for phrase in TASK_PHRASES)
+
+
 def parse_message(text: str) -> tuple[str | None, str | None]:
     """
     Retorna (task_number, url) si el mensaje tiene el formato esperado,
@@ -49,6 +60,9 @@ def parse_message(text: str) -> tuple[str | None, str | None]:
         https://...
     """
     if not text:
+        return None, None
+
+    if not has_task_phrase(text):
         return None, None
 
     url = extract_url(text)

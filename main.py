@@ -2,19 +2,14 @@ import asyncio
 import logging
 import os
 import re
-import shlex
-import subprocess
-from datetime import datetime
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
 from config import (
     API_ID, API_HASH, PHONE, GROUP,
-    TARGET_USER, START_HOUR, END_HOUR,
     SESSION_PATH, ERROR_PAUSE_SECONDS, HEARTBEAT_INTERVAL,
 )
-from parser import parse_message
 
 
 class _SanitizeFilter(logging.Filter):
@@ -58,59 +53,34 @@ app = Client(
     workdir=SESSION_PATH,
 )
 
-processing_lock = asyncio.Lock()
 
+async def _load_history(client: Client):
+    print("\n" + "="*60)
+    print(f"  HISTORIAL DEL GRUPO: {GROUP}")
+    print("="*60)
+    messages = []
+    async for msg in client.get_chat_history(GROUP, limit=50):
+        messages.append(msg)
 
-def is_active_hours() -> bool:
-    return START_HOUR <= datetime.now().hour < END_HOUR
+    if not messages:
+        print("  (sin mensajes previos)")
+    else:
+        for msg in reversed(messages):
+            text   = msg.text or msg.caption or "[sin texto]"
+            sender = msg.from_user.first_name if msg.from_user else "Desconocido"
+            ts     = msg.date.strftime("%Y-%m-%d %H:%M:%S")
+            print(f"  [{ts}] {sender}: {text}")
 
-
-def open_in_telegram_app(url: str) -> bool:
-    """Abre la URL en la app de Telegram instalada en el celular."""
-    safe_url = shlex.quote(url)
-    try:
-        result = subprocess.run(
-            ["su", "-c", f"am start -a android.intent.action.VIEW -d {safe_url} -p org.telegram.messenger"],
-            capture_output=True, text=True, timeout=15
-        )
-        if result.returncode == 0:
-            logger.info("URL abierta en Telegram app.")
-            return True
-        logger.error("Error al abrir URL: %s", result.stderr.strip())
-        return False
-    except Exception as e:
-        logger.error("Excepcion abriendo URL: %s", e)
-        return False
+    print("="*60)
+    print(f"  {len(messages)} mensajes cargados. Escuchando en vivo...\n")
 
 
 @app.on_message(filters.chat(GROUP) & (filters.text | filters.caption))
-async def handle_group_message(client: Client, message: Message):
-    if not is_active_hours():
-        return
-
-    text = message.text or message.caption or ""
-    task_number, url = parse_message(text)
-
-    if not url:
-        return
-
-    if processing_lock.locked():
-        logger.warning("Tarea en proceso, mensaje ignorado.")
-        return
-
-    async with processing_lock:
-        logger.info("Tarea %s detectada: %s", task_number, url)
-
-        await asyncio.get_event_loop().run_in_executor(None, open_in_telegram_app, url)
-
-        caption = f"Tarea {task_number}\n{url}" if task_number else url
-
-        try:
-            await client.send_message(chat_id=TARGET_USER, text=caption)
-            logger.info("Link enviado a %s", TARGET_USER)
-        except Exception as e:
-            logger.error("Error al enviar mensaje: %s", e)
-            await asyncio.sleep(ERROR_PAUSE_SECONDS)
+async def show_live_message(client: Client, message: Message):
+    text   = message.text or message.caption or "[sin texto]"
+    sender = message.from_user.first_name if message.from_user else "Desconocido"
+    ts     = message.date.strftime("%H:%M:%S")
+    print(f"[LIVE {ts}] {sender}: {text}")
 
 
 async def _heartbeat():
@@ -120,10 +90,11 @@ async def _heartbeat():
 
 
 async def _run():
-    logger.info("Iniciando bot. Activo de %dhs a %dhs.", START_HOUR, END_HOUR)
+    logger.info("Iniciando bot.")
     await app.start()
     me = await app.get_me()
     logger.info("Sesion iniciada como %s", me.username or me.first_name)
+    await _load_history(app)
     asyncio.create_task(_heartbeat())
     await asyncio.Event().wait()
 
