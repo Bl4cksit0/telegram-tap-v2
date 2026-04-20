@@ -2,7 +2,8 @@ import os
 import re
 from datetime import datetime
 from dotenv import load_dotenv
-from pyrogram import Client, filters, idle
+from pyrogram import Client, idle
+from pyrogram.handlers import MessageHandler
 
 load_dotenv()
 
@@ -52,40 +53,39 @@ async def procesar_tarea(client, texto):
     except Exception as e:
         print(f"  [ERROR] No se pudo enviar a @{BOT_DEST}: {e}")
 
-@app.on_message()
-async def leer_mensaje(client, message):
+async def handler_live(client, message):
     hora   = datetime.now().strftime("%H:%M:%S")
     nombre = message.from_user.first_name if message.from_user else "Desconocido"
     texto  = message.text or message.caption or "(sin texto)"
     chat   = getattr(message.chat, "username", None) or str(message.chat.id)
 
-    print(f"[LIVE {hora}] [{chat}] {nombre}: {texto[:60]}")
+    print(f"[LIVE {hora}] [{chat}] {nombre}: {texto[:80]}")
 
-    if chat == GROUP.lstrip("@") or str(message.chat.id) == GROUP:
-        if es_tarea(texto):
-            await procesar_tarea(client, texto)
+    if es_tarea(texto):
+        await procesar_tarea(client, texto)
 
 async def main():
-    await app.start()
-    async for _ in app.get_dialogs():
-        break
+    async with app:
+        app.add_handler(MessageHandler(handler_live))
 
-    limite = input("¿Cuántos mensajes del historial revisar? (50-500): ").strip()
-    limite = max(50, min(500, int(limite) if limite.isdigit() else 100))
+        async for _ in app.get_dialogs():
+            break
 
-    print(f"\nRevisando los últimos {limite} mensajes del historial...")
-    async for msg in app.get_chat_history(GROUP, limit=limite):
-        texto = msg.text or msg.caption or ""
-        if not texto:
-            continue
-        fecha = msg.date.strftime("%Y-%m-%d %H:%M")
-        nombre = msg.from_user.first_name if msg.from_user else "Desconocido"
-        print(f"[{fecha}] {nombre}: {texto[:80]}")
-        if es_tarea(texto):
-            await procesar_tarea(app, texto)
+        limite = input("¿Cuántos mensajes del historial revisar? (50-500): ").strip()
+        limite = max(50, min(500, int(limite) if limite.isdigit() else 100))
 
-    print("\nHistorial revisado. Escuchando mensajes en vivo... (Ctrl+C para salir)")
-    await idle()
-    await app.stop()
+        print(f"\nRevisando los últimos {limite} mensajes del historial...")
+        async for msg in app.get_chat_history(GROUP, limit=limite):
+            texto = msg.text or msg.caption or ""
+            if not texto:
+                continue
+            fecha  = msg.date.strftime("%Y-%m-%d %H:%M")
+            nombre = msg.from_user.first_name if msg.from_user else "Desconocido"
+            print(f"[{fecha}] {nombre}: {texto[:80]}")
+            if es_tarea(texto):
+                await procesar_tarea(app, texto)
+
+        print("\nHistorial revisado. Escuchando en vivo... (Ctrl+C para salir)")
+        await idle()
 
 app.run(main())
